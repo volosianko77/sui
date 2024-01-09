@@ -12,6 +12,7 @@ use crate::{authority::AuthorityState, authority_client::AuthorityAPI};
 use async_trait::async_trait;
 use mysten_metrics::spawn_monitored_task;
 use sui_config::genesis::Genesis;
+use sui_network::tonic;
 use sui_types::error::SuiResult;
 use sui_types::messages_grpc::{
     HandleCertificateResponseV2, HandleTransactionResponse, ObjectInfoRequest, ObjectInfoResponse,
@@ -55,6 +56,7 @@ impl AuthorityAPI for LocalAuthorityClient {
     async fn handle_transaction(
         &self,
         transaction: Transaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleTransactionResponse, SuiError> {
         if self.fault_config.fail_before_handle_transaction {
             return Err(SuiError::from("Mock error before handle_transaction"));
@@ -82,6 +84,7 @@ impl AuthorityAPI for LocalAuthorityClient {
     async fn handle_certificate_v2(
         &self,
         certificate: CertifiedTransaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleCertificateResponseV2, SuiError> {
         let state = self.state.clone();
         let fault_config = self.fault_config;
@@ -234,6 +237,7 @@ impl AuthorityAPI for MockAuthorityApi {
     async fn handle_transaction(
         &self,
         _transaction: Transaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleTransactionResponse, SuiError> {
         unimplemented!();
     }
@@ -242,6 +246,7 @@ impl AuthorityAPI for MockAuthorityApi {
     async fn handle_certificate_v2(
         &self,
         _certificate: CertifiedTransaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleCertificateResponseV2, SuiError> {
         unimplemented!()
     }
@@ -311,6 +316,7 @@ impl AuthorityAPI for HandleTransactionTestAuthorityClient {
     async fn handle_transaction(
         &self,
         _transaction: Transaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleTransactionResponse, SuiError> {
         if let Some(duration) = self.sleep_duration_before_responding {
             tokio::time::sleep(duration).await;
@@ -321,6 +327,7 @@ impl AuthorityAPI for HandleTransactionTestAuthorityClient {
     async fn handle_certificate_v2(
         &self,
         _certificate: CertifiedTransaction,
+        _metadata: Option<tonic::metadata::MetadataMap>,
     ) -> Result<HandleCertificateResponseV2, SuiError> {
         if let Some(duration) = self.sleep_duration_before_responding {
             tokio::time::sleep(duration).await;
