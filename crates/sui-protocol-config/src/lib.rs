@@ -387,6 +387,10 @@ struct FeatureFlags {
     // Reject functions with mutable Random.
     #[serde(skip_serializing_if = "is_false")]
     reject_mutable_random_on_entry_functions: bool,
+
+    // Enable the poseidon hash function
+    #[serde(skip_serializing_if = "is_false")]
+    enable_vdf: bool,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -902,6 +906,10 @@ pub struct ProtocolConfig {
     // zklogin::check_zklogin_issuer
     check_zklogin_issuer_cost_base: Option<u64>,
 
+    // VDF related functions
+    vdf_verify_vdf_cost: Option<u64>,
+    vdf_hash_to_input_cost: Option<u64>,
+
     // Const params for consensus scoring decision
     // The scaling factor property for the MED outlier detection
     scoring_decision_mad_divisor: Option<f64>,
@@ -1158,6 +1166,10 @@ impl ProtocolConfig {
 
     pub fn reject_mutable_random_on_entry_functions(&self) -> bool {
         self.feature_flags.reject_mutable_random_on_entry_functions
+    }
+
+    pub fn enable_vdf(&self) -> bool {
+        self.feature_flags.enable_vdf
     }
 }
 
@@ -1545,6 +1557,9 @@ impl ProtocolConfig {
             // zklogin::check_zklogin_issuer
             check_zklogin_issuer_cost_base: None,
 
+            vdf_verify_vdf_cost: None,
+            vdf_hash_to_input_cost: None,
+
             max_size_written_objects: None,
             max_size_written_objects_system_tx: None,
 
@@ -1897,6 +1912,13 @@ impl ProtocolConfig {
                 }
                 37 => {
                     cfg.feature_flags.reject_mutable_random_on_entry_functions = true;
+
+                    if chain != Chain::Mainnet && chain != Chain::Testnet {
+                        // enable vdf in devnet
+                        cfg.feature_flags.enable_vdf = true;
+                        cfg.vdf_verify_vdf_cost = Some(2000);
+                        cfg.vdf_hash_to_input_cost = Some(1000);
+                    }
                 }
                 // Use this template when making changes:
                 //
