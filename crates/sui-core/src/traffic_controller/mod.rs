@@ -6,29 +6,32 @@ pub mod nodefw_client;
 #[cfg(debug_assertions)]
 pub mod nodefw_test_server;
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::{collections::HashMap, sync::Arc};
 
 use crate::traffic_controller::nodefw_client::{BlockAddress, BlockAddresses, NodeFWClient};
 use chrono::{DateTime, Utc};
+use jsonrpsee::types::error::ErrorCode;
 use mysten_metrics::spawn_monitored_task;
 use parking_lot::RwLock;
+use sui_types::error::SuiError;
 use sui_types::traffic_control::{
-    Policy, PolicyConfig, PolicyResponse, RemoteFirewallConfig, TrafficControlPolicy, TrafficTally,
+    Policy, PolicyConfig, PolicyResponse, RemoteFirewallConfig, ServiceResponse,
+    TrafficControlPolicy, TrafficTally,
 };
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
-use tracing::warn;
+use tracing::{info, warn};
 
-type BlocklistT = Arc<RwLock<HashMap<SocketAddr, DateTime<Utc>>>>;
+type BlocklistT = Arc<RwLock<HashMap<IpAddr, DateTime<Utc>>>>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Blocklists {
     connection_ips: BlocklistT,
     proxy_ips: BlocklistT,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TrafficController {
     tally_channel: mpsc::Sender<TrafficTally>,
     blocklists: Blocklists,
@@ -81,7 +84,8 @@ impl TrafficController {
         }
     }
 
-    async fn check_and_clear_blocklist(&self, ip: SocketAddr, connection_ips: bool) -> bool {
+    async fn check_and_clear_blocklist(&self, addr: SocketAddr, connection_ips: bool) -> bool {
+        let ip = addr.ip();
         let blocklist = if connection_ips {
             self.blocklists.connection_ips.clone()
         } else {
@@ -92,12 +96,63 @@ impl TrafficController {
         let expiration = blocklist.read().get(&ip).copied();
         match expiration {
             Some(expiration) if now >= expiration => {
-                blocklist.write().remove(&ip);
+                {
+                    info!(
+                        "TESTING -- check_and_clear - clearing IP {:?} from blocklist. now: {:?}, expiration: {:?}. Blocklist before: {:?}", 
+                        ip, now, expiration, blocklist.read()
+                    );
+                }
+                {
+                    blocklist.write().remove(&ip);
+                }
+                {
+                    info!(
+                        "TESTING -- check_and_clear - Blocklist after: {:?}",
+                        blocklist.read(),
+                    );
+                }
                 true
             }
-            None => true,
-            _ => false,
+            None => {
+                info!("TESTING -- check_and_clear - IP {:?} not in blocklist", ip);
+                true
+            }
+            _ => {
+                info!(
+                    "TESTING -- check_and_clear - ip {:?} in blocklist, now: {:?}, expiration: {:?}, blocklist: {:?}",
+                    ip, now, expiration, blocklist.read()
+                );
+                false
+            }
         }
+    }
+}
+
+// TODO: Needs thorough testing/auditing before this can be used in error policy
+//
+/// Errors that are tallied and can be used to determine if a request should be blocked.
+fn is_tallyable_error(response: &ServiceResponse) -> bool {
+    match response {
+        ServiceResponse::Validator(Err(err)) => {
+            matches!(
+                err,
+                SuiError::UserInputError { .. }
+                    | SuiError::InvalidSignature { .. }
+                    | SuiError::SignerSignatureAbsent { .. }
+                    | SuiError::SignerSignatureNumberMismatch { .. }
+                    | SuiError::IncorrectSigner { .. }
+                    | SuiError::UnknownSigner { .. }
+                    | SuiError::WrongEpoch { .. }
+            )
+        }
+        ServiceResponse::Fullnode(resp) => {
+            matches!(
+                resp.error_code.map(ErrorCode::from),
+                Some(ErrorCode::InvalidRequest) | Some(ErrorCode::InvalidParams)
+            )
+        }
+
+        _ => false,
     }
 }
 
@@ -122,7 +177,7 @@ async fn run_tally_loop(
         tokio::select! {
             received = receiver.recv() => match received {
                 Some(tally) => {
-                    handle_spam_tally(
+                    if let Err(err) = handle_spam_tally(
                         &mut spam_policy,
                         &policy_config,
                         &node_fw_client,
@@ -130,10 +185,11 @@ async fn run_tally_loop(
                         tally.clone(),
                         spam_blocklists.clone(),
                     )
-                    .await
-                    .expect("Error handling spam tally");
+                    .await {
+                        warn!("Error handling spam tally: {}", err);
+                    }
 
-                    handle_error_tally(
+                    if let Err(err) = handle_error_tally(
                         &mut error_policy,
                         &policy_config,
                         &node_fw_client,
@@ -141,8 +197,9 @@ async fn run_tally_loop(
                         tally,
                         error_blocklists.clone(),
                     )
-                    .await
-                    .expect("Error handling error tally");
+                    .await {
+                        warn!("Error handling error tally: {}", err);
+                    }
                 }
                 None => {
                     panic!("TrafficController tally channel closed unexpectedly");
@@ -163,10 +220,8 @@ async fn handle_error_tally(
     if tally.result.is_ok() {
         return Ok(());
     }
-    if let Err(err) = tally.clone().result {
-        if !policy_config.tallyable_error_codes.contains(&err) {
-            return Ok(());
-        }
+    if !is_tallyable_error(&tally.result) {
+        return Ok(());
     }
     let resp = policy.handle_tally(tally.clone());
     if fw_config.delegate_error_blocking {
@@ -209,7 +264,7 @@ async fn handle_spam_tally(
         )
         .await
     } else {
-        handle_policy_response(resp, policy_config, tally, blocklists).await;
+        handle_policy_response(resp, policy_config, tally, blocklists.clone()).await;
         Ok(())
     }
 }
@@ -228,6 +283,7 @@ async fn handle_policy_response(
     blocklists: Arc<Blocklists>,
 ) {
     if block_connection_ip {
+        info!("Blocking connection IP: {:?}", tally.connection_ip);
         blocklists.connection_ips.write().insert(
             tally
                 .connection_ip
@@ -236,6 +292,7 @@ async fn handle_policy_response(
         );
     }
     if block_proxy_ip {
+        info!("Blocking proxy IP: {:?}", tally.proxy_ip);
         blocklists.proxy_ips.write().insert(
             tally
                 .proxy_ip
@@ -261,6 +318,7 @@ async fn delegate_policy_response(
 ) -> Result<(), reqwest::Error> {
     let mut addresses = vec![];
     if block_connection_ip {
+        info!("Delegating block connection IP: {:?}", tally.connection_ip);
         addresses.push(BlockAddress {
             source_address: tally.connection_ip.unwrap().to_string(),
             destination_port,
@@ -268,13 +326,18 @@ async fn delegate_policy_response(
         });
     }
     if block_proxy_ip {
+        info!("Delegating block proxy IP: {:?}", tally.proxy_ip);
         addresses.push(BlockAddress {
             source_address: tally.proxy_ip.unwrap().to_string(),
             destination_port,
             ttl: *proxy_blocklist_ttl_sec,
         });
     }
-    node_fw_client
-        .block_addresses(BlockAddresses { addresses })
-        .await
+    if addresses.is_empty() {
+        Ok(())
+    } else {
+        node_fw_client
+            .block_addresses(BlockAddresses { addresses })
+            .await
+    }
 }
