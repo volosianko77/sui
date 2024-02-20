@@ -546,10 +546,10 @@ move-stackless-bytecode = { path = "external-crates/move/crates/move-stackless-b
 move-symbol-pool = { path = "external-crates/move/crates/move-symbol-pool" }
 move-abstract-stack = { path = "external-crates/move/crates/move-abstract-stack" }
 
-fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "e833047605644c9e41669b7d44f4252aea6a7ec9" }
-fastcrypto-tbls = { git = "https://github.com/MystenLabs/fastcrypto", rev = "e833047605644c9e41669b7d44f4252aea6a7ec9" }
-fastcrypto-vdf = { git = "https://github.com/MystenLabs/fastcrypto", rev = "e833047605644c9e41669b7d44f4252aea6a7ec9", features = ["experimental"], package = "fastcrypto-vdf" }
-fastcrypto-zkp = { git = "https://github.com/MystenLabs/fastcrypto", rev = "e833047605644c9e41669b7d44f4252aea6a7ec9", package = "fastcrypto-zkp" }
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "76bc5413e79c7e5c717b2538131a7a1a923124b4" }
+fastcrypto-tbls = { git = "https://github.com/MystenLabs/fastcrypto", rev = "76bc5413e79c7e5c717b2538131a7a1a923124b4" }
+fastcrypto-vdf = { git = "https://github.com/MystenLabs/fastcrypto", rev = "76bc5413e79c7e5c717b2538131a7a1a923124b4", features = ["experimental"], package = "fastcrypto-vdf" }
+fastcrypto-zkp = { git = "https://github.com/MystenLabs/fastcrypto", rev = "76bc5413e79c7e5c717b2538131a7a1a923124b4", package = "fastcrypto-zkp" }
 
 # anemo dependencies
 anemo = { git = "https://github.com/mystenlabs/anemo.git", rev = "26d415eb9aa6a2417be3c03c57d6e93c30bd1ad7" }
