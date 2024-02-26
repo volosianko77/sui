@@ -36,6 +36,7 @@ use super::{
     transaction_metadata::TransactionMetadata,
     type_filter::ExactTypeFilter,
 };
+use crate::zk_login_verify::{ZkLoginVerify, ZkLoginVerifyResult};
 use crate::{
     config::ServiceConfig, context_data::db_data_provider::PgManager, data::Db, error::Error,
     mutation::Mutation,
@@ -390,6 +391,16 @@ impl Query {
         coin_type: ExactTypeFilter,
     ) -> Result<Option<CoinMetadata>> {
         CoinMetadata::query(ctx.data_unchecked(), coin_type.0)
+            .await
+            .extend()
+    }
+
+    /// Verify a zkLogin signature. 
+    async fn verify_zklogin_signature(&self, ctx: &Context<'_>, bytes: String,
+    signature: String,
+    intent_scope: u8,
+    author: SuiAddress,) -> Result<ZkLoginVerifyResult> {
+        ZkLoginVerify::verify_zklogin_signature(ctx.data_unchecked(), bytes, signature, intent_scope, author)
             .await
             .extend()
     }

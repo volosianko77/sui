@@ -17,3 +17,4 @@ pub(crate) mod raw_query;
 pub mod server;
 pub mod test_infra;
 mod types;
+pub(crate) mod zk_login_verify;

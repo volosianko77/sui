@@ -76,6 +76,8 @@
 #### &emsp;&emsp;[With Defaults Ascending](#1179641)
 ### [Transaction Block Effects](#19)
 #### &emsp;&emsp;[Transaction Block Effects](#1245165)
+### [Verify Zklogin Signature](#20)
+#### &emsp;&emsp;[Verify Zklogin Signature](#1310700)
 ## <a id=0></a>
 ## Address
 ### <a id=0></a>
@@ -1696,5 +1698,15 @@
 >      }
 >    }
 >  }
+>}</pre>
+
+## <a id=20></a>
+## Verify Zklogin Signature
+### <a id=1310700></a>
+### Verify Zklogin Signature
+####  Returns the chain identifier for the chain that the server is tracking
+
+><pre>{
+>  chainIdentifier
 >}</pre>
 
