@@ -15,17 +15,18 @@ use consensus_config::{
     ProtocolPublicKey, DIGEST_LENGTH,
 };
 use enum_dispatch::enum_dispatch;
-use fastcrypto::traits::{Signer, ToFromBytes};
 use fastcrypto::{
     hash::{Digest, HashFunction},
-    traits::VerifyingKey as _,
+    traits::{Signer, ToFromBytes, VerifyingKey as _},
 };
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 
-use crate::context::Context;
-use crate::error::ConsensusResult;
-use crate::{ensure, error::ConsensusError};
+use crate::{
+    context::Context,
+    ensure,
+    error::{ConsensusError, ConsensusResult},
+};
 
 const GENESIS_ROUND: Round = 0;
 
@@ -599,9 +600,11 @@ mod tests {
 
     use fastcrypto::error::FastCryptoError;
 
-    use crate::block::{SignedBlock, TestBlock};
-    use crate::context::Context;
-    use crate::error::ConsensusError;
+    use crate::{
+        block::{SignedBlock, TestBlock},
+        context::Context,
+        error::ConsensusError,
+    };
 
     #[test]
     fn test_sign_and_verify() {
