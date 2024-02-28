@@ -13778,6 +13778,7 @@ dependencies = [
  "narwhal-crypto",
  "nonempty",
  "once_cell",
+ "parking_lot 0.12.1",
  "prometheus",
  "proptest",
  "proptest-derive",

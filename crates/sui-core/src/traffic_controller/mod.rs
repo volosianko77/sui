@@ -2,44 +2,73 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod metrics;
 pub mod nodefw_client;
 #[cfg(debug_assertions)]
 pub mod nodefw_test_server;
+pub mod policies;
 
 use std::net::{IpAddr, SocketAddr};
 use std::{collections::HashMap, sync::Arc};
 
+use self::metrics::TrafficControllerMetrics;
 use crate::traffic_controller::nodefw_client::{BlockAddress, BlockAddresses, NodeFWClient};
+use crate::traffic_controller::policies::{
+    Policy, PolicyResponse, TrafficControlPolicy, TrafficTally,
+};
 use chrono::{DateTime, Utc};
 use jsonrpsee::types::error::ErrorCode;
 use mysten_metrics::spawn_monitored_task;
 use parking_lot::RwLock;
+use std::fmt::Debug;
 use sui_types::error::SuiError;
-use sui_types::traffic_control::{
-    Policy, PolicyConfig, PolicyResponse, RemoteFirewallConfig, ServiceResponse,
-    TrafficControlPolicy, TrafficTally,
-};
+use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig, ServiceResponse};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 type BlocklistT = Arc<RwLock<HashMap<IpAddr, DateTime<Utc>>>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct Blocklists {
     connection_ips: BlocklistT,
     proxy_ips: BlocklistT,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TrafficController {
     tally_channel: mpsc::Sender<TrafficTally>,
     blocklists: Blocklists,
-    //metrics: TrafficControllerMetrics, // TODO
+    metrics: Arc<TrafficControllerMetrics>,
+}
+
+impl Debug for TrafficController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // NOTE: we do not want to print the contents of the blocklists to logs
+        // given that (1) it contains all requests IPs, and (2) it could be quite
+        // large. Instead, we print lengths of the blocklists. Further, we prefer
+        // to get length from the metrics rather than from the blocklists themselves
+        // to avoid unneccesarily aquiring the read lock.
+        f.debug_struct("TrafficController")
+            .field(
+                "connection_ip_blocklist_len",
+                &self.metrics.connection_ip_blocklist_len.get(),
+            )
+            .field(
+                "proxy_ip_blocklist_len",
+                &self.metrics.proxy_ip_blocklist_len.get(),
+            )
+            .finish()
+    }
 }
 
 impl TrafficController {
-    pub async fn spawn(fw_config: RemoteFirewallConfig, policy_config: PolicyConfig) -> Self {
+    pub async fn spawn(
+        fw_config: RemoteFirewallConfig,
+        policy_config: PolicyConfig,
+        metrics: TrafficControllerMetrics,
+    ) -> Self {
+        let metrics = Arc::new(metrics);
         let (tx, rx) = mpsc::channel(policy_config.channel_capacity);
         let ret = Self {
             tally_channel: tx,
@@ -47,9 +76,16 @@ impl TrafficController {
                 connection_ips: Arc::new(RwLock::new(HashMap::new())),
                 proxy_ips: Arc::new(RwLock::new(HashMap::new())),
             },
+            metrics: metrics.clone(),
         };
         let blocklists = ret.blocklists.clone();
-        spawn_monitored_task!(run_tally_loop(rx, policy_config, fw_config, blocklists));
+        spawn_monitored_task!(run_tally_loop(
+            rx,
+            policy_config,
+            fw_config,
+            blocklists,
+            metrics
+        ));
         ret
     }
 
@@ -86,42 +122,29 @@ impl TrafficController {
 
     async fn check_and_clear_blocklist(&self, addr: SocketAddr, connection_ips: bool) -> bool {
         let ip = addr.ip();
-        let blocklist = if connection_ips {
-            self.blocklists.connection_ips.clone()
+        let (blocklist, metric_gauge) = if connection_ips {
+            (
+                self.blocklists.connection_ips.clone(),
+                &self.metrics.connection_ip_blocklist_len,
+            )
         } else {
-            self.blocklists.proxy_ips.clone()
+            (
+                self.blocklists.proxy_ips.clone(),
+                &self.metrics.proxy_ip_blocklist_len,
+            )
         };
 
         let now = Utc::now();
         let expiration = blocklist.read().get(&ip).copied();
         match expiration {
             Some(expiration) if now >= expiration => {
-                {
-                    info!(
-                        "TESTING -- check_and_clear - clearing IP {:?} from blocklist. now: {:?}, expiration: {:?}. Blocklist before: {:?}", 
-                        ip, now, expiration, blocklist.read()
-                    );
-                }
-                {
-                    blocklist.write().remove(&ip);
-                }
-                {
-                    info!(
-                        "TESTING -- check_and_clear - Blocklist after: {:?}",
-                        blocklist.read(),
-                    );
-                }
+                metric_gauge.dec();
+                blocklist.write().remove(&ip);
                 true
             }
-            None => {
-                info!("TESTING -- check_and_clear - IP {:?} not in blocklist", ip);
-                true
-            }
+            None => true,
             _ => {
-                info!(
-                    "TESTING -- check_and_clear - ip {:?} in blocklist, now: {:?}, expiration: {:?}, blocklist: {:?}",
-                    ip, now, expiration, blocklist.read()
-                );
+                self.metrics.requests_blocked_at_protocol.inc();
                 false
             }
         }
@@ -161,9 +184,10 @@ async fn run_tally_loop(
     policy_config: PolicyConfig,
     fw_config: RemoteFirewallConfig,
     blocklists: Blocklists,
+    metrics: Arc<TrafficControllerMetrics>,
 ) {
-    let mut spam_policy = policy_config.clone().to_spam_policy();
-    let mut error_policy = policy_config.clone().to_error_policy();
+    let mut spam_policy = TrafficControlPolicy::from_spam_config(policy_config.clone()).await;
+    let mut error_policy = TrafficControlPolicy::from_error_config(policy_config.clone()).await;
     let spam_blocklists = Arc::new(blocklists.clone());
     let error_blocklists = Arc::new(blocklists);
     let node_fw_client = if !(fw_config.delegate_spam_blocking || fw_config.delegate_error_blocking)
@@ -184,6 +208,7 @@ async fn run_tally_loop(
                         &fw_config,
                         tally.clone(),
                         spam_blocklists.clone(),
+                        metrics.clone(),
                     )
                     .await {
                         warn!("Error handling spam tally: {}", err);
@@ -196,6 +221,7 @@ async fn run_tally_loop(
                         &fw_config,
                         tally,
                         error_blocklists.clone(),
+                        metrics.clone(),
                     )
                     .await {
                         warn!("Error handling error tally: {}", err);
@@ -216,6 +242,7 @@ async fn handle_error_tally(
     fw_config: &RemoteFirewallConfig,
     tally: TrafficTally,
     blocklists: Arc<Blocklists>,
+    metrics: Arc<TrafficControllerMetrics>,
 ) -> Result<(), reqwest::Error> {
     if tally.result.is_ok() {
         return Ok(());
@@ -234,10 +261,11 @@ async fn handle_error_tally(
             client,
             tally,
             fw_config.destination_port,
+            metrics.clone(),
         )
         .await
     } else {
-        handle_policy_response(resp, policy_config, tally, blocklists).await;
+        handle_policy_response(resp, policy_config, tally, blocklists, metrics).await;
         Ok(())
     }
 }
@@ -249,6 +277,7 @@ async fn handle_spam_tally(
     fw_config: &RemoteFirewallConfig,
     tally: TrafficTally,
     blocklists: Arc<Blocklists>,
+    metrics: Arc<TrafficControllerMetrics>,
 ) -> Result<(), reqwest::Error> {
     let resp = policy.handle_tally(tally.clone());
     if fw_config.delegate_spam_blocking {
@@ -261,64 +290,85 @@ async fn handle_spam_tally(
             client,
             tally,
             fw_config.destination_port,
+            metrics.clone(),
         )
         .await
     } else {
-        handle_policy_response(resp, policy_config, tally, blocklists.clone()).await;
+        handle_policy_response(resp, policy_config, tally, blocklists.clone(), metrics).await;
         Ok(())
     }
 }
 
 async fn handle_policy_response(
-    PolicyResponse {
+    response: PolicyResponse,
+    policy_config: &PolicyConfig,
+    tally: TrafficTally,
+    blocklists: Arc<Blocklists>,
+    metrics: Arc<TrafficControllerMetrics>,
+) {
+    let PolicyResponse {
         block_connection_ip,
         block_proxy_ip,
-    }: PolicyResponse,
-    PolicyConfig {
+    } = response;
+    let PolicyConfig {
         connection_blocklist_ttl_sec,
         proxy_blocklist_ttl_sec,
         ..
-    }: &PolicyConfig,
-    tally: TrafficTally,
-    blocklists: Arc<Blocklists>,
-) {
-    if block_connection_ip {
-        info!("Blocking connection IP: {:?}", tally.connection_ip);
-        blocklists.connection_ips.write().insert(
-            tally
-                .connection_ip
-                .expect("Expected connection IP if policy is blocking it"),
-            Utc::now() + chrono::Duration::seconds(*connection_blocklist_ttl_sec as i64),
-        );
+    } = policy_config;
+    if block_connection_ip
+        && blocklists
+            .connection_ips
+            .write()
+            .insert(
+                tally
+                    .connection_ip
+                    .expect("Expected connection IP if policy is blocking it"),
+                Utc::now() + chrono::Duration::seconds(*connection_blocklist_ttl_sec as i64),
+            )
+            .is_none()
+    {
+        // Only increment the metric if the IP was not already blocked
+        debug!("Blocking connection IP");
+        metrics.connection_ip_blocklist_len.inc();
     }
-    if block_proxy_ip {
-        info!("Blocking proxy IP: {:?}", tally.proxy_ip);
-        blocklists.proxy_ips.write().insert(
-            tally
-                .proxy_ip
-                .expect("Expected proxy IP if policy is blocking it"),
-            Utc::now() + chrono::Duration::seconds(*proxy_blocklist_ttl_sec as i64),
-        );
+    if block_proxy_ip
+        && blocklists
+            .proxy_ips
+            .write()
+            .insert(
+                tally
+                    .proxy_ip
+                    .expect("Expected proxy IP if policy is blocking it"),
+                Utc::now() + chrono::Duration::seconds(*proxy_blocklist_ttl_sec as i64),
+            )
+            .is_none()
+    {
+        // Only increment the metric if the IP was not already blocked
+        debug!("Blocking proxy IP");
+        metrics.proxy_ip_blocklist_len.inc();
     }
 }
 
 async fn delegate_policy_response(
-    PolicyResponse {
-        block_connection_ip,
-        block_proxy_ip,
-    }: PolicyResponse,
-    PolicyConfig {
-        connection_blocklist_ttl_sec,
-        proxy_blocklist_ttl_sec,
-        ..
-    }: &PolicyConfig,
+    response: PolicyResponse,
+    policy_config: &PolicyConfig,
     node_fw_client: &NodeFWClient,
     tally: TrafficTally,
     destination_port: u16,
+    metrics: Arc<TrafficControllerMetrics>,
 ) -> Result<(), reqwest::Error> {
+    let PolicyResponse {
+        block_connection_ip,
+        block_proxy_ip,
+    } = response;
+    let PolicyConfig {
+        connection_blocklist_ttl_sec,
+        proxy_blocklist_ttl_sec,
+        ..
+    } = policy_config;
     let mut addresses = vec![];
     if block_connection_ip {
-        info!("Delegating block connection IP: {:?}", tally.connection_ip);
+        debug!("Delegating connection IP blocking to firewall");
         addresses.push(BlockAddress {
             source_address: tally.connection_ip.unwrap().to_string(),
             destination_port,
@@ -326,7 +376,7 @@ async fn delegate_policy_response(
         });
     }
     if block_proxy_ip {
-        info!("Delegating block proxy IP: {:?}", tally.proxy_ip);
+        debug!("Delegating proxy IP blocking to firewall");
         addresses.push(BlockAddress {
             source_address: tally.proxy_ip.unwrap().to_string(),
             destination_port,
@@ -336,8 +386,18 @@ async fn delegate_policy_response(
     if addresses.is_empty() {
         Ok(())
     } else {
-        node_fw_client
+        metrics
+            .blocks_delegated_to_firewall
+            .inc_by(addresses.len() as u64);
+        match node_fw_client
             .block_addresses(BlockAddresses { addresses })
             .await
+        {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                metrics.firewall_delegation_request_fail.inc();
+                Err(err)
+            }
+        }
     }
 }

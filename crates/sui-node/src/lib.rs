@@ -27,6 +27,7 @@ use sui_core::authority::CHAIN_IDENTIFIER;
 use sui_core::consensus_adapter::SubmitToConsensus;
 use sui_core::epoch::randomness::RandomnessManager;
 use sui_core::execution_cache::NotifyReadWrapper;
+use sui_core::traffic_controller::metrics::TrafficControllerMetrics;
 use sui_json_rpc_api::JsonRpcMetrics;
 use sui_types::base_types::ConciseableName;
 use sui_types::digests::ChainIdentifier;
@@ -1292,6 +1293,7 @@ impl SuiNode {
             state.clone(),
             consensus_adapter,
             Arc::new(ValidatorServiceMetrics::new(prometheus_registry)),
+            TrafficControllerMetrics::new(prometheus_registry),
             config.policy_config.clone(),
             config.firewall_config.clone(),
         )

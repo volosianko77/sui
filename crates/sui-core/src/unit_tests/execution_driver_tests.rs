@@ -23,6 +23,7 @@ use crate::test_utils::{
 };
 use crate::transaction_manager::MAX_PER_OBJECT_QUEUE_LENGTH;
 use sui_types::error::SuiError;
+use sui_types::traffic_control::RemoteFirewallConfig;
 
 use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -763,6 +764,9 @@ async fn test_authority_txn_signing_pushback() {
         authority_state.clone(),
         consensus_adapter,
         Arc::new(ValidatorServiceMetrics::new_for_tests()),
+        TrafficControllerMetrics::new_for_tests(),
+        None,
+        RemoteFirewallConfig::default(),
     ));
 
     // Manually make the authority into overload state and reject 100% of traffic.
@@ -890,6 +894,9 @@ async fn test_authority_txn_execution_pushback() {
         authority_state.clone(),
         consensus_adapter,
         Arc::new(ValidatorServiceMetrics::new_for_tests()),
+        TrafficControllerMetrics::new_for_tests(),
+        None,
+        RemoteFirewallConfig::default(),
     ));
 
     // Manually make the authority into overload state and reject 100% of traffic.
