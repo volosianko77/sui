@@ -24,12 +24,12 @@ impl ZkLoginVerify {
     /// - `bytes` is either the personal message in raw bytes or transaction data bytes in
     ///    BCS-encoded and then Base64-encoded.
     /// - `signature` is a serialized zkLogin signature that is Base64-encoded.
-    /// - `intent_scope` is a u8 representing the intent scope of bytes.
+    /// - `intent_scope` is a u64 representing the intent scope of bytes.
     pub(crate) async fn verify_zklogin_signature(
         ctx: &Context<'_>,
         bytes: String,
         signature: String,
-        intent_scope: u8,
+        intent_scope: u64,
         author: SuiAddress,
     ) -> Result<ZkLoginVerifyResult> {
         let sui_sdk_client: &Option<SuiClient> = ctx
@@ -46,9 +46,17 @@ impl ZkLoginVerify {
             .get_latest_sui_system_state()
             .await?
             .epoch;
-
+        let safe_intent = if intent_scope > u8::MAX as u64 {
+            return Err(Error::Internal("Invalid intent scope".to_string()).into());
+        } else {
+            IntentScope::try_from(intent_scope as u8)
+                .map_err(|_| Error::Internal("Invalid intent scope".to_string()))
+        }?;
         let verify_params = VerifyParams::default();
-info!("jzjz bytes: {}, signature: {}, intent_scope: {}, author: {}", bytes, signature, intent_scope, author);
+        info!(
+            "jzjz bytes: {}, signature: {}, intent_scope: {}, author: {}",
+            bytes, signature, intent_scope, author
+        );
         match GenericSignature::from_bytes(
             &Base64::decode(&signature)
                 .map_err(|_| Error::Internal("Invalid base64 encoding".to_string()))?,
@@ -58,9 +66,7 @@ info!("jzjz bytes: {}, signature: {}, intent_scope: {}, author: {}", bytes, sign
             GenericSignature::ZkLoginAuthenticator(zk) => {
                 let bytes = Base64::decode(&bytes)
                     .map_err(|_| Error::Internal("Invalid bytes".to_string()))?;
-                match IntentScope::try_from(intent_scope)
-                    .map_err(|_| Error::Internal("Invalid intent scope".to_string()))?
-                {
+                match safe_intent {
                     IntentScope::TransactionData => {
                         let tx_data: TransactionData = bcs::from_bytes(&bytes)
                             .map_err(|_| Error::Internal("Invalid tx data bytes".to_string()))?;

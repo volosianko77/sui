@@ -395,14 +395,24 @@ impl Query {
             .extend()
     }
 
-    /// Verify a zkLogin signature. 
-    async fn verify_zklogin_signature(&self, ctx: &Context<'_>, bytes: String,
-    signature: String,
-    intent_scope: u8,
-    author: SuiAddress,) -> Result<ZkLoginVerifyResult> {
-        ZkLoginVerify::verify_zklogin_signature(ctx.data_unchecked(), bytes, signature, intent_scope, author)
-            .await
-            .extend()
+    /// Verify a zkLogin signature.
+    async fn verify_zklogin_signature(
+        &self,
+        ctx: &Context<'_>,
+        bytes: String,
+        signature: String,
+        intent_scope: u64,
+        author: SuiAddress,
+    ) -> Result<ZkLoginVerifyResult> {
+        ZkLoginVerify::verify_zklogin_signature(
+            ctx.data_unchecked(),
+            bytes,
+            signature,
+            intent_scope,
+            author,
+        )
+        .await
+        .extend()
     }
 }
 
