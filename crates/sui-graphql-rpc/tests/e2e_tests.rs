@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "pg_integration")]
+// #[cfg(feature = "pg_integration")]
 mod tests {
     use fastcrypto::encoding::{Base64, Encoding};
     use rand::rngs::StdRng;
@@ -448,7 +448,7 @@ mod tests {
             },
             GraphqlQueryVariable {
                 name: "intent_scope".to_string(),
-                ty: "Int".to_string(),
+                ty: "Int!".to_string(),
                 value: json!(intent_scope),
             },
             GraphqlQueryVariable {

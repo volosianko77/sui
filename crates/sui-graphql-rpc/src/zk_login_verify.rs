@@ -1,7 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data::Db;
 use crate::error::Error;
+use crate::types::epoch::Epoch;
 use crate::types::sui_address::SuiAddress;
 use async_graphql::*;
 use fastcrypto::encoding::Encoding;
@@ -9,7 +11,6 @@ use fastcrypto::{encoding::Base64, traits::ToFromBytes};
 use shared_crypto::intent::{
     AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage,
 };
-use sui_sdk::SuiClient;
 use sui_types::signature::GenericSignature;
 use sui_types::signature::{AuthenticatorTrait, VerifyParams};
 use sui_types::transaction::TransactionData;
@@ -26,26 +27,20 @@ impl ZkLoginVerify {
     /// - `signature` is a serialized zkLogin signature that is Base64-encoded.
     /// - `intent_scope` is a u64 representing the intent scope of bytes.
     pub(crate) async fn verify_zklogin_signature(
-        ctx: &Context<'_>,
+        db: &Db,
         bytes: String,
         signature: String,
         intent_scope: u64,
         author: SuiAddress,
-    ) -> Result<ZkLoginVerifyResult> {
-        let sui_sdk_client: &Option<SuiClient> = ctx
-            .data()
-            .map_err(|_| Error::Internal("Unable to fetch Sui SDK client".to_string()))
-            .extend()?;
-        let sui_sdk_client = sui_sdk_client
-            .as_ref()
-            .ok_or_else(|| Error::Internal("Sui SDK client not initialized".to_string()))
-            .extend()?;
+    ) -> Result<ZkLoginVerifyResult, Error> {
+        let epoch = Epoch::query(db, None, None).await?;
 
-        let curr_epoch = sui_sdk_client
-            .governance_api()
-            .get_latest_sui_system_state()
-            .await?
-            .epoch;
+        let Some(curr_epoch) = epoch else {
+            return Err(Error::Internal("Cannot get current epoch".to_string()));
+        };
+
+        let curr_epoch = curr_epoch.stored.epoch as u64;
+
         let safe_intent = if intent_scope > u8::MAX as u64 {
             return Err(Error::Internal("Invalid intent scope".to_string()).into());
         } else {
