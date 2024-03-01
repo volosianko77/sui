@@ -3,14 +3,22 @@
 
 use crate::data::Db;
 use crate::error::Error;
+use crate::types::base64::Base64;
+use crate::types::chain_identifier::ChainIdentifier;
+use crate::types::dynamic_field::{DynamicField, DynamicFieldName};
 use crate::types::epoch::Epoch;
 use crate::types::sui_address::SuiAddress;
+use crate::types::type_filter::ExactTypeFilter;
 use async_graphql::*;
 use fastcrypto::encoding::Encoding;
-use fastcrypto::{encoding::Base64, traits::ToFromBytes};
+use fastcrypto::{encoding::Base64 as FastcryptoBase64, traits::ToFromBytes};
+use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
+use im::hashmap::HashMap as ImHashMap;
 use shared_crypto::intent::{
     AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage,
 };
+use std::str::FromStr;
+use sui_types::dynamic_field::DynamicFieldType;
 use sui_types::signature::GenericSignature;
 use sui_types::signature::{AuthenticatorTrait, VerifyParams};
 use sui_types::transaction::TransactionData;
@@ -34,6 +42,24 @@ impl ZkLoginVerify {
         author: SuiAddress,
     ) -> Result<ZkLoginVerifyResult, Error> {
         let epoch = Epoch::query(db, None, None).await?;
+        let _chain_id = ChainIdentifier::query(db).await?;
+
+        let name = DynamicFieldName {
+            type_: ExactTypeFilter::from_str("u64").unwrap(),
+            bcs: Base64::from_str("AQAAAAAAAAA=").unwrap(),
+        };
+        let df = DynamicField::query(
+            db,
+            SuiAddress::from_str("0x7").unwrap(),
+            None,
+            name,
+            DynamicFieldType::DynamicField,
+            None,
+        )
+        .await
+        .unwrap();
+
+        info!("ttk object {:?}", df.unwrap().super_);
 
         let Some(curr_epoch) = epoch else {
             return Err(Error::Internal("Cannot get current epoch".to_string()));
@@ -42,24 +68,23 @@ impl ZkLoginVerify {
         let curr_epoch = curr_epoch.stored.epoch as u64;
 
         let safe_intent = if intent_scope > u8::MAX as u64 {
-            return Err(Error::Internal("Invalid intent scope".to_string()).into());
+            return Err(Error::Internal("Invalid intent scope".to_string()));
         } else {
             IntentScope::try_from(intent_scope as u8)
                 .map_err(|_| Error::Internal("Invalid intent scope".to_string()))
         }?;
-        let verify_params = VerifyParams::default();
-        info!(
-            "jzjz bytes: {}, signature: {}, intent_scope: {}, author: {}",
-            bytes, signature, intent_scope, author
-        );
+
+        let oidc_provider_jwks = ImHashMap::new();
+        let verify_params =
+            VerifyParams::new(oidc_provider_jwks, vec![], ZkLoginEnv::Prod, true, true);
         match GenericSignature::from_bytes(
-            &Base64::decode(&signature)
+            &FastcryptoBase64::decode(&signature)
                 .map_err(|_| Error::Internal("Invalid base64 encoding".to_string()))?,
         )
         .map_err(|_| Error::Internal("Cannot parse generic signature".to_string()))?
         {
             GenericSignature::ZkLoginAuthenticator(zk) => {
-                let bytes = Base64::decode(&bytes)
+                let bytes = FastcryptoBase64::decode(&bytes)
                     .map_err(|_| Error::Internal("Invalid bytes".to_string()))?;
                 match safe_intent {
                     IntentScope::TransactionData => {

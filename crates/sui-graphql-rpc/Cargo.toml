@@ -20,6 +20,7 @@ const-str.workspace = true
 diesel.workspace = true
 either.workspace = true
 fastcrypto = { workspace = true, features = ["copy_key"] }
+fastcrypto-zkp.workspace = true
 futures.workspace = true
 git-version.workspace = true
 hex.workspace = true
@@ -74,6 +75,7 @@ test-cluster.workspace = true
 sui-protocol-config.workspace = true
 move-bytecode-utils.workspace = true
 sui-package-resolver.workspace = true
+im.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

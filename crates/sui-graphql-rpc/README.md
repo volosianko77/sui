@@ -39,7 +39,11 @@ diesel migration run --database-url="<DATABASE_URL>" --migration-dir=migrations_
 See [src/commands.rs](src/commands.rs) for all CLI options.
 
 ```
-cargo run --bin sui-graphql-rpc start-server [--rpc-url] [--db-url] [--port] [--host] [--config]
+cargo run --bin sui-graphql-rpc start-server --node-rpc-url http://127.0.0.1:9000 --db-url postgres://postgres:postgrespw@localhost:5432/sui_indexer_v2 
+
+cargo run --bin sui-graphql-rpc start-server --node-rpc-url https://fullnode.mainnet.sui.io:443 --db-url postgres://postgres:postgrespw@localhost:5432/sui_indexer_v2 
+
+[--port] [--host] [--config]
 ```
 
 This will build sui-graphql-rpc and start an IDE:
