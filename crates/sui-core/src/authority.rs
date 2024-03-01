@@ -2726,6 +2726,23 @@ impl AuthorityState {
         }
     }
 
+    /// Acquire the execution lock while setting transaction locks during signing.
+    /// Required to ensure that we do not reconfigure while signing a transaction.
+    pub async fn execution_lock_for_signing(
+        &self,
+        epoch_id: EpochId,
+    ) -> SuiResult<ExecutionLockReadGuard> {
+        let lock = self.execution_lock.read().await;
+        if *lock == epoch_id {
+            Ok(lock)
+        } else {
+            Err(SuiError::WrongEpoch {
+                expected_epoch: *lock,
+                actual_epoch: epoch_id,
+            })
+        }
+    }
+
     pub async fn execution_lock_for_reconfiguration(&self) -> ExecutionLockWriteGuard {
         self.execution_lock.write().await
     }
@@ -3869,9 +3886,12 @@ impl AuthorityState {
     ) -> SuiResult {
         let tx_digest = *transaction.digest();
 
+        let epoch = epoch_store.epoch();
+        let execution_lock = self.execution_lock_for_signing(epoch).await?;
+
         // Acquire the lock on input objects
         self.execution_cache
-            .acquire_transaction_locks(epoch_store, owned_input_objects, tx_digest)
+            .acquire_transaction_locks(epoch_store, &execution_lock, owned_input_objects, tx_digest)
             .await?;
 
         // Write transactions after because if we write before, there is a chance the lock can fail

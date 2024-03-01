@@ -1147,6 +1147,22 @@ impl AuthorityStore {
         Ok(())
     }
 
+    pub(crate) fn write_locks(&self, locks_to_write: &[(ObjectRef, LockDetails)]) -> SuiResult {
+        trace!(?locks_to_write, "Writing locks");
+        let mut batch = self
+            .perpetual_tables
+            .owned_object_locked_transactions
+            .batch();
+        batch.insert_batch(
+            &self.perpetual_tables.owned_object_locked_transactions,
+            locks_to_write
+                .iter()
+                .map(|(obj_ref, lock)| (*obj_ref, LockDetailsWrapper::from(lock.clone()))),
+        )?;
+        batch.write()?;
+        Ok(())
+    }
+
     /// Gets ObjectLockInfo that represents state of lock on an object.
     /// Returns UserInputError::ObjectNotFound if cannot find lock record for this object
     pub(crate) fn get_lock(
@@ -1264,6 +1280,19 @@ impl AuthorityStore {
                 })
             })?
             .0)
+    }
+
+    pub(crate) fn get_locked_transaction(
+        &self,
+        obj_ref: &ObjectRef,
+        epoch_store: &AuthorityPerEpochStore,
+    ) -> SuiResult<Option<LockDetails>> {
+        assert!(epoch_store.object_lock_split_tables_enabled());
+        Ok(self
+            .perpetual_tables
+            .owned_object_locked_transactions
+            .get(obj_ref)
+            .map(|lock| lock.map(|l| l.migrate().into_inner()))?)
     }
 
     /// Checks multiple object locks exist.
