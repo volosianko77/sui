@@ -934,11 +934,12 @@ impl AuthorityStore {
 
     pub(crate) async fn acquire_transaction_locks(
         &self,
-        epoch_store: &AuthorityPerEpochStore,
+        // TODO: this param can be removed when all validators have upgraded to split tables
+        epoch_start_config: &EpochStartConfiguration,
         owned_input_objects: &[ObjectRef],
         tx_digest: TransactionDigest,
     ) -> SuiResult {
-        if epoch_store.object_lock_split_tables_enabled() {
+        if epoch_start_config.object_lock_split_tables_enabled() {
             self.acquire_transaction_locks_v2(epoch_store, owned_input_objects, tx_digest)
                 .await
         } else {
@@ -1035,11 +1036,10 @@ impl AuthorityStore {
 
     async fn acquire_transaction_locks_v2(
         &self,
-        epoch_store: &AuthorityPerEpochStore,
+        epoch: EpochId,
         owned_input_objects: &[ObjectRef],
         tx_digest: TransactionDigest,
     ) -> SuiResult {
-        let epoch = epoch_store.epoch();
         // Other writers may be attempting to acquire locks on the same objects, so a mutex is
         // required.
         // TODO: replace with optimistic db_transactions (i.e. set lock to tx if none)
@@ -1285,9 +1285,7 @@ impl AuthorityStore {
     pub(crate) fn get_locked_transaction(
         &self,
         obj_ref: &ObjectRef,
-        epoch_store: &AuthorityPerEpochStore,
     ) -> SuiResult<Option<LockDetails>> {
-        assert!(epoch_store.object_lock_split_tables_enabled());
         Ok(self
             .perpetual_tables
             .owned_object_locked_transactions

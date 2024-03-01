@@ -690,6 +690,28 @@ async fn test_write_transaction_outputs_is_sync() {
 }
 
 #[tokio::test]
+async fn test_acquire_transaction_locks_is_sync() {
+    telemetry_subscribers::init_for_testing();
+    Scenario::iterate(|mut s| async move {
+        s.with_created(&[1, 2]);
+        let tx1 = s.do_tx().await;
+
+        let objects = vec![s.object(1), s.object(2)]
+            .into_iter()
+            .map(|o| o.compute_object_reference());
+
+        // assert that acquire_transaction_locks is sync in non-simtest, which causes the
+        // fail_point_async! macros above to be elided
+        s.cache
+            .acquire_transaction_locks(&objects)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+    })
+    .await;
+}
+
+#[tokio::test]
 #[should_panic(expected = "should be empty due to revert_state_update")]
 async fn test_missing_reverts_panic() {
     telemetry_subscribers::init_for_testing();

@@ -1301,8 +1301,7 @@ impl AuthorityPerEpochStore {
 
     pub fn object_lock_split_tables_enabled(&self) -> bool {
         self.epoch_start_configuration
-            .flags()
-            .contains(&EpochFlag::ObjectLockSplitTables)
+            .object_lock_split_tables_enabled()
     }
 
     // For each id in objects_to_init, return the next version for that id as recorded in the

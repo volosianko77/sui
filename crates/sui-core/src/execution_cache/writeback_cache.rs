@@ -669,6 +669,8 @@ impl WritebackCache {
         for (obj_ref, live_object) in owned_input_objects.iter().zip(live_objects.into_iter()) {
             Self::verify_live_object(obj_ref, &live_object)?;
 
+            fail_point_async!("acquire_transaction_locks_wait");
+
             let new_lock = LockDetails { epoch, tx_digest };
             match self.try_set_transaction_lock(obj_ref, new_lock.clone(), epoch_store) {
                 Ok(()) => {
@@ -1313,7 +1315,7 @@ impl ExecutionCacheRead for WritebackCache {
             UserInputError::ObjectNotFound {
                 object_id,
                 version: None,
-            }
+            },
         )?;
         Ok(obj.compute_object_reference())
     }
