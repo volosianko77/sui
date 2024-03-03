@@ -3,15 +3,13 @@
 
 use std::sync::Arc;
 
-use mysten_metrics::metered_channel;
-use mysten_metrics::metered_channel::channel_with_total;
+use mysten_metrics::{metered_channel, metered_channel::channel_with_total};
 use sui_protocol_config::ProtocolConfig;
 use tap::tap::TapFallible;
 use thiserror::Error;
 use tracing::error;
 
-use crate::block::Transaction;
-use crate::context::Context;
+use crate::{block::Transaction, context::Context};
 
 /// The maximum number of transactions pending to the queue to be pulled for block proposal
 const MAX_PENDING_TRANSACTIONS: usize = 2_000;
@@ -58,6 +56,7 @@ impl TransactionConsumer {
         }
 
         while let Ok(transaction) = self.tx_receiver.try_recv() {
+            tracing::error!("ARUN: CONSENSUS TRANSACTION CONSUMED {:#?}", transaction);
             total_size += transaction.data().len();
 
             // If we went over the max size with this transaction, just cache it for the next pull.
@@ -115,6 +114,10 @@ impl TransactionClient {
     // Submits a transaction to be sequenced. The transaction length gets evaluated and rejected from consensus if too big.
     // That shouldn't be the common case as sizes should be aligned between consensus and client.
     pub async fn submit(&self, transaction: Vec<u8>) -> Result<(), ClientError> {
+        tracing::error!(
+            "ARUN: SUBMIT TO MYSTICETI(consensus side) {:#?}",
+            transaction
+        );
         if transaction.len() as u64 > self.max_transaction_size {
             return Err(ClientError::OversizedTransaction(
                 transaction.len() as u64,
@@ -162,10 +165,14 @@ impl TransactionVerifier for NoopTransactionVerifier {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::Context;
-    use crate::transaction::{TransactionClient, TransactionConsumer};
     use std::sync::Arc;
+
     use sui_protocol_config::ProtocolConfig;
+
+    use crate::{
+        context::Context,
+        transaction::{TransactionClient, TransactionConsumer},
+    };
 
     #[tokio::test]
     async fn basic_submit_and_consume() {

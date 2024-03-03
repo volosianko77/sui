@@ -314,6 +314,7 @@ impl Core {
     fn try_commit(&mut self) -> ConsensusResult<Vec<CommittedSubDag>> {
         // TODO: Add optimization to abort early without quorum for a round.
         let sequenced_leaders = self.committer.try_commit(self.last_decided_leader);
+        tracing::info!("Committing leaders {:#?}", sequenced_leaders);
 
         if let Some(last) = sequenced_leaders.last() {
             self.last_decided_leader = last.get_decided_slot();

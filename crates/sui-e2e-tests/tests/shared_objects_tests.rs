@@ -1,31 +1,35 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::join_all;
-use futures::join;
+use std::{
+    ops::Deref,
+    time::{Duration, SystemTime},
+};
+
+use futures::{future::join_all, join};
 use rand::distributions::Distribution;
-use std::ops::Deref;
-use std::time::{Duration, SystemTime};
 use sui_config::node::AuthorityOverloadConfig;
-use sui_core::authority::EffectsNotifyRead;
-use sui_core::consensus_adapter::position_submit_certificate;
+use sui_core::{authority::EffectsNotifyRead, consensus_adapter::position_submit_certificate};
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::{register_fail_point_async, sim_test};
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
 use sui_test_transaction_builder::{
     publish_basics_package, publish_basics_package_and_make_counter, TestTransactionBuilder,
 };
-use sui_types::effects::TransactionEffectsAPI;
-use sui_types::event::Event;
-use sui_types::execution_status::{CommandArgumentError, ExecutionFailureStatus, ExecutionStatus};
-use sui_types::messages_grpc::{LayoutGenerationOption, ObjectInfoRequest};
-use sui_types::transaction::{CallArg, ObjectArg};
+use sui_types::{
+    effects::TransactionEffectsAPI,
+    event::Event,
+    execution_status::{CommandArgumentError, ExecutionFailureStatus, ExecutionStatus},
+    messages_grpc::{LayoutGenerationOption, ObjectInfoRequest},
+    transaction::{CallArg, ObjectArg},
+};
 use test_cluster::TestClusterBuilder;
 use tokio::time::sleep;
 
 /// Send a simple shared object transaction to Sui and ensures the client gets back a response.
 #[sim_test]
 async fn shared_object_transaction() {
+    telemetry_subscribers::init_for_testing();
     let test_cluster = TestClusterBuilder::new().build().await;
     let (sender, mut objects) = test_cluster.wallet.get_one_account().await.unwrap();
     let rgp = test_cluster.get_reference_gas_price().await;

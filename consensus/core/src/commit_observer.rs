@@ -6,12 +6,12 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::error::{ConsensusError, ConsensusResult};
 use crate::{
     block::{timestamp_utc_ms, BlockAPI, VerifiedBlock},
     commit::{load_committed_subdag_from_store, CommitIndex, CommittedSubDag},
     context::Context,
     dag_state::DagState,
+    error::{ConsensusError, ConsensusResult},
     linearizer::Linearizer,
     storage::Store,
 };
@@ -77,7 +77,7 @@ impl CommitObserver {
                 );
                 return Err(ConsensusError::Shutdown);
             }
-            tracing::debug!(
+            tracing::info!(
                 "Sending to execution commit {} leader {}",
                 committed_sub_dag.commit_index,
                 committed_sub_dag.leader

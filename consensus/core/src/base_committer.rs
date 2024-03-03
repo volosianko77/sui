@@ -94,6 +94,7 @@ impl BaseCommitter {
         let wave = self.wave_number(leader.round);
         let decision_round = self.decision_round(wave);
         let leader_blocks = self.dag_state.read().get_uncommitted_blocks_at_slot(leader);
+        tracing::info!("ARUN trying direct decide from uncommitted blocks {leader_blocks:#?}");
         let mut leaders_with_enough_support: Vec<_> = leader_blocks
             .into_iter()
             .filter(|l| self.enough_leader_support(decision_round, l))

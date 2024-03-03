@@ -169,6 +169,7 @@ impl ConsensusManagerTrait for MysticetiManager {
     }
 
     async fn shutdown(&self) {
+        tracing::error!("ARUN: SHUTDOWN MYSTICETI!");
         let Some(_guard) = RunningLockGuard::acquire_shutdown(&self.metrics, &self.running).await
         else {
             return;
