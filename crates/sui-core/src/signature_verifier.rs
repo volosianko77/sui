@@ -360,7 +360,8 @@ impl SignatureVerifier {
         self.signed_data_cache.is_verified(
             signed_tx.full_message_digest(),
             || {
-                signed_tx.verify_epoch(
+                signed_tx.verify_epoch(self.committee.epoch())?;
+                signed_tx.verify_epoch_for_all_sigs(
                     self.committee.epoch(),
                     self.zk_login_params.zklogin_max_epoch_upper_bound,
                 )?;
@@ -503,7 +504,7 @@ pub fn batch_verify_all_certificates_and_checkpoints(
     // certs.data() is assumed to be verified already by the caller.
 
     for ckpt in checkpoints {
-        ckpt.data().verify_epoch(committee.epoch(), None)?;
+        ckpt.data().verify_epoch(committee.epoch())?;
     }
 
     batch_verify(committee, certs, checkpoints)

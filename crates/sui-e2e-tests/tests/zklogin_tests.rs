@@ -61,6 +61,7 @@ async fn test_zklogin_feature_legacy_address_deny() {
 
     let _guard = ProtocolConfig::apply_overrides_for_testing(|_, mut config| {
         config.set_verify_legacy_zklogin_address(false);
+        config.set_zklogin_upper_bound_max_epoch(None);
         config
     });
 

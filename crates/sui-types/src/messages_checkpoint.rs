@@ -202,7 +202,7 @@ impl Message for CheckpointSummary {
         Ok(())
     }
 
-    fn verify_epoch(&self, epoch: EpochId, _upper_bound_for_max_epoch: Option<u64>) -> SuiResult {
+    fn verify_epoch(&self, epoch: EpochId) -> SuiResult {
         fp_ensure!(
             self.epoch == epoch,
             SuiError::WrongEpoch {

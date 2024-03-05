@@ -23,7 +23,6 @@ use sui_types::{
     zk_login_authenticator::ZkLoginAuthenticator,
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
-use tracing::info;
 
 async fn do_upgraded_multisig_test() -> SuiResult {
     let test_cluster = TestClusterBuilder::new().build().await;
