@@ -56,7 +56,7 @@
 -  [Function `epoch_start_timestamp_ms`](#0x3_sui_system_state_inner_epoch_start_timestamp_ms)
 -  [Function `validator_stake_amount`](#0x3_sui_system_state_inner_validator_stake_amount)
 -  [Function `total_stake_amount`](#0x3_sui_system_state_inner_total_stake_amount)
--  [Function `validator_voting_power`](#0x3_sui_system_state_inner_validator_voting_power)
+-  [Function `active_validator_voting_powers`](#0x3_sui_system_state_inner_active_validator_voting_powers)
 -  [Function `validator_staking_pool_id`](#0x3_sui_system_state_inner_validator_staking_pool_id)
 -  [Function `validator_staking_pool_mappings`](#0x3_sui_system_state_inner_validator_staking_pool_mappings)
 -  [Function `get_reporters_of`](#0x3_sui_system_state_inner_get_reporters_of)
@@ -68,6 +68,7 @@
 
 
 <pre><code><b>use</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="../../dependencies/sui-framework/bag.md#0x2_bag">0x2::bag</a>;
 <b>use</b> <a href="../../dependencies/sui-framework/balance.md#0x2_balance">0x2::balance</a>;
 <b>use</b> <a href="../../dependencies/sui-framework/coin.md#0x2_coin">0x2::coin</a>;
@@ -2284,13 +2285,13 @@
 
 </details>
 
-<a name="0x3_sui_system_state_inner_validator_voting_power"></a>
+<a name="0x3_sui_system_state_inner_active_validator_voting_powers"></a>
 
-## Function `validator_voting_power`
+## Function `active_validator_voting_powers`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_validator_voting_power">validator_voting_power</a>(self: &<a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, validator_addr: <b>address</b>): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_active_validator_voting_powers">active_validator_voting_powers</a>(self: &<a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>): <a href="../../dependencies/sui-framework/vec_map.md#0x2_vec_map_VecMap">vec_map::VecMap</a>&lt;<b>address</b>, u64&gt;
 </code></pre>
 
 
@@ -2299,8 +2300,15 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_validator_voting_power">validator_voting_power</a>(self: &<a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">SuiSystemStateInnerV2</a>, validator_addr: <b>address</b>): u64 {
-    <a href="../../dependencies/sui-system/validator_set.md#0x3_validator_set_validator_voting_power">validator_set::validator_voting_power</a>(&self.validators, validator_addr)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_active_validator_voting_powers">active_validator_voting_powers</a>(self: &<a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">SuiSystemStateInnerV2</a>): VecMap&lt;<b>address</b>, u64&gt; {
+    <b>let</b> active_validators = <a href="../../dependencies/sui-system/sui_system_state_inner.md#0x3_sui_system_state_inner_active_validator_addresses">active_validator_addresses</a>(self);
+    <b>let</b> voting_powers = <a href="../../dependencies/sui-framework/vec_map.md#0x2_vec_map_empty">vec_map::empty</a>();
+    <b>while</b> (!<a href="../../dependencies/move-stdlib/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&active_validators)) {
+        <b>let</b> <a href="../../dependencies/sui-system/validator.md#0x3_validator">validator</a> = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> active_validators);
+        <b>let</b> <a href="../../dependencies/sui-system/voting_power.md#0x3_voting_power">voting_power</a> = <a href="../../dependencies/sui-system/validator_set.md#0x3_validator_set_validator_voting_power">validator_set::validator_voting_power</a>(&self.validators, <a href="../../dependencies/sui-system/validator.md#0x3_validator">validator</a>);
+        <a href="../../dependencies/sui-framework/vec_map.md#0x2_vec_map_insert">vec_map::insert</a>(&<b>mut</b> voting_powers, <a href="../../dependencies/sui-system/validator.md#0x3_validator">validator</a>, <a href="../../dependencies/sui-system/voting_power.md#0x3_voting_power">voting_power</a>);
+    };
+    voting_powers
 }
 </code></pre>
 
