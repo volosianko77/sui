@@ -38,7 +38,10 @@ pub type BlockTimestampMs = u64;
 // Returns the current time expressed as UNIX timestamp in milliseconds.
 pub fn timestamp_utc_ms() -> BlockTimestampMs {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_millis() as BlockTimestampMs,
+        Ok(n) => {
+            // tracing::info!("timestamp_utc_ms called {:?}", n.as_millis());
+            n.as_millis() as BlockTimestampMs
+        }
         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
     }
 }

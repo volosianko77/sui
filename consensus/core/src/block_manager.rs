@@ -77,6 +77,8 @@ impl BlockManager {
         &mut self,
         mut blocks: Vec<VerifiedBlock>,
     ) -> (Vec<VerifiedBlock>, BTreeSet<BlockRef>) {
+        tracing::info!("ARUN block manager add blocks {blocks:#?}");
+
         blocks.sort_by_key(|b| b.round());
 
         let mut accepted_blocks = vec![];
@@ -84,6 +86,8 @@ impl BlockManager {
 
         for block in blocks {
             if let Some(block) = self.try_accept_one_block(block) {
+                tracing::info!("ARUN block acceppted {block}");
+
                 // Try to unsuspend any children blocks.
                 let unsuspended_blocks = self.try_unsuspend_children_blocks(&block);
 
@@ -165,12 +169,15 @@ impl BlockManager {
     /// block is accepted then Some result is returned. None is returned when either the block is suspended or the block
     /// has been already accepted before.
     fn try_accept_one_block(&mut self, block: VerifiedBlock) -> Option<VerifiedBlock> {
+        tracing::info!("ARUN block manager try acccept one block {block}");
+
         let block_ref = block.reference();
         let mut missing_ancestors = BTreeSet::new();
         let dag_state = self.dag_state.read();
 
         // If block has been already received and suspended, or already processed and stored, or is a genesis block, then skip it.
         if self.suspended_blocks.contains_key(&block_ref) || dag_state.contains_block(&block_ref) {
+            tracing::info!("ARUN self.suspended_blocks.contains_key(&{block_ref}) || dag_state.contains_block(&{block_ref})");
             return None;
         }
 

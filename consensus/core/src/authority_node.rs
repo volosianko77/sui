@@ -237,6 +237,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         peer: AuthorityIndex,
         serialized_block: Bytes,
     ) -> ConsensusResult<()> {
+        tracing::info!("ARUN handle_send_block {peer}");
         // TODO: dedup block verifications, here and with fetched blocks.
         let signed_block: SignedBlock =
             bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
@@ -268,27 +269,37 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         let verified_block = VerifiedBlock::new_verified(signed_block, serialized_block);
 
         // Reject block with timestamp too far in the future.
+        tracing::info!(
+            "{} NOW IN HANDLE SEND BLOCK {:?}",
+            self.context.own_index,
+            timestamp_utc_ms()
+        );
         let forward_time_drift = Duration::from_millis(
             verified_block
                 .timestamp_ms()
                 .saturating_sub(timestamp_utc_ms()),
         );
+        tracing::info!("Block {verified_block:#?}");
         if forward_time_drift > self.context.parameters.max_forward_time_drift {
-            return Err(ConsensusError::BlockTooFarInFuture {
-                block_timestamp: verified_block.timestamp_ms(),
-                forward_time_drift,
-            });
+            // let e: ConsensusError = Err(ConsensusError::BlockTooFarInFuture {
+            //     block_timestamp: verified_block.timestamp_ms(),
+            //     forward_time_drift,
+            // });
+            tracing::error!("{} received block from {peer} to far in the future from forward_time_drift {forward_time_drift:?} > {:?}",
+             self.context.own_index, self.context.parameters.max_forward_time_drift);
+            // return e;
         }
 
         // Wait until the block's timestamp is current.
         if forward_time_drift > Duration::ZERO {
+            tracing::error!("WAITING!!! {}", peer);
             self.context
                 .metrics
                 .node_metrics
                 .block_timestamp_drift_wait_ms
                 .with_label_values(&[&peer.to_string()])
                 .inc_by(forward_time_drift.as_millis() as u64);
-            sleep(forward_time_drift).await;
+            // sleep(forward_time_drift).await;
         }
 
         let missing_ancestors = self
@@ -298,6 +309,8 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             .map_err(|_| ConsensusError::Shutdown)?;
 
         if !missing_ancestors.is_empty() {
+            tracing::error!("missing ancestors!!! {missing_ancestors:#?}");
+
             // schedule the fetching of them from this peer
             if let Err(err) = self
                 .synchronizer
@@ -316,6 +329,8 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         peer: AuthorityIndex,
         block_refs: Vec<BlockRef>,
     ) -> ConsensusResult<Vec<Bytes>> {
+        tracing::info!("ARUN handle_fetch_block {peer}");
+
         const MAX_ALLOWED_FETCH_BLOCKS: usize = 200;
 
         if block_refs.len() > MAX_ALLOWED_FETCH_BLOCKS {

@@ -77,7 +77,7 @@ impl SubmitToConsensus for LazyMysticetiClient {
         transaction: &ConsensusTransaction,
         _epoch_store: &Arc<AuthorityPerEpochStore>,
     ) -> SuiResult {
-        tracing::error!("ARUN: SUBMIT TO MYSTICETI(sui side) {:#?}", transaction);
+        tracing::error!("ARUN: SUBMIT TO MYSTICETI(sui side) ",);
         // TODO(mysticeti): confirm comment is still true
         // The retrieved TransactionClient can be from the past epoch. Submit would fail after
         // Mysticeti shuts down, so there should be no correctness issue.

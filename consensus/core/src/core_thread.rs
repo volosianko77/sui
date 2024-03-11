@@ -77,6 +77,7 @@ impl CoreThread {
             self.context.metrics.node_metrics.core_lock_dequeued.inc();
             match command {
                 CoreThreadCommand::AddBlocks(blocks, sender) => {
+                    tracing::info!("ARUN CORETHREADCOMMMNAND:ADDBLOCKs");
                     let missing_blocks = self.core.add_blocks(blocks)?;
                     sender.send(missing_blocks).ok();
                 }
@@ -154,6 +155,7 @@ impl CoreThreadDispatcher for ChannelCoreThreadDispatcher {
         &self,
         blocks: Vec<VerifiedBlock>,
     ) -> Result<BTreeSet<BlockRef>, CoreError> {
+        tracing::info!("ARUN CoreThreadDispatcher add_blokcs");
         let (sender, receiver) = oneshot::channel();
         self.send(CoreThreadCommand::AddBlocks(blocks, sender))
             .await;
@@ -161,6 +163,8 @@ impl CoreThreadDispatcher for ChannelCoreThreadDispatcher {
     }
 
     async fn force_new_block(&self, round: Round) -> Result<(), CoreError> {
+        tracing::info!("ARUN CoreThreadDispatcher force_new_block");
+
         let (sender, receiver) = oneshot::channel();
         self.send(CoreThreadCommand::ForceNewBlock(round, sender))
             .await;
@@ -168,6 +172,7 @@ impl CoreThreadDispatcher for ChannelCoreThreadDispatcher {
     }
 
     async fn get_missing_blocks(&self) -> Result<BTreeSet<BlockRef>, CoreError> {
+        tracing::info!("ARUN CoreThreadDispatcher get_missing_blocks");
         let (sender, receiver) = oneshot::channel();
         self.send(CoreThreadCommand::GetMissing(sender)).await;
         receiver.await.map_err(Shutdown)

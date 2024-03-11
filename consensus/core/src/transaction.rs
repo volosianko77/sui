@@ -56,7 +56,7 @@ impl TransactionConsumer {
         }
 
         while let Ok(transaction) = self.tx_receiver.try_recv() {
-            tracing::error!("ARUN: CONSENSUS TRANSACTION CONSUMED {:#?}", transaction);
+            tracing::error!("ARUN: CONSENSUS TRANSACTION CONSUMED");
             total_size += transaction.data().len();
 
             // If we went over the max size with this transaction, just cache it for the next pull.
@@ -114,10 +114,7 @@ impl TransactionClient {
     // Submits a transaction to be sequenced. The transaction length gets evaluated and rejected from consensus if too big.
     // That shouldn't be the common case as sizes should be aligned between consensus and client.
     pub async fn submit(&self, transaction: Vec<u8>) -> Result<(), ClientError> {
-        tracing::error!(
-            "ARUN: SUBMIT TO MYSTICETI(consensus side) {:#?}",
-            transaction
-        );
+        tracing::error!("ARUN: SUBMIT TO MYSTICETI(consensus side)",);
         if transaction.len() as u64 > self.max_transaction_size {
             return Err(ClientError::OversizedTransaction(
                 transaction.len() as u64,

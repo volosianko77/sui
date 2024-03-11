@@ -112,6 +112,7 @@ impl Core {
     }
 
     fn recover(mut self, genesis_blocks: Vec<VerifiedBlock>) -> Self {
+        tracing::info!("ARUN recover");
         // We always need the genesis blocks as a starter point since we might not have advanced yet at all.
         let mut all_blocks = genesis_blocks;
 
@@ -148,6 +149,7 @@ impl Core {
         blocks: Vec<VerifiedBlock>,
     ) -> ConsensusResult<BTreeSet<BlockRef>> {
         let _scope = monitored_scope("Core::add_blocks");
+        tracing::info!("ARUN add blocks {blocks:#?}");
 
         // Try to accept them via the block manager
         let (accepted_blocks, missing_blocks) = self.block_manager.try_accept_blocks(blocks);
@@ -175,11 +177,14 @@ impl Core {
         accepted_blocks: Vec<VerifiedBlock>,
         pending_ancestors_retain_rounds: Option<u32>,
     ) {
+        tracing::info!("ARUN add accepted blocks");
         // Advance the threshold clock. If advanced to a new round then send a signal that a new quorum has been received.
         if let Some(new_round) = self
             .threshold_clock
             .add_blocks(accepted_blocks.iter().map(|b| b.reference()).collect())
         {
+            tracing::info!("ARUN advance the threshold clock");
+
             // notify that threshold clock advanced to new round
             self.signals.new_round(new_round);
         }
@@ -192,6 +197,8 @@ impl Core {
             .set(self.threshold_clock.get_round() as i64);
 
         for accepted_block in accepted_blocks {
+            tracing::info!("accepted block {accepted_block}");
+
             self.pending_ancestors
                 .entry(accepted_block.round())
                 .or_default()
@@ -216,6 +223,7 @@ impl Core {
         &mut self,
         round: Round,
     ) -> ConsensusResult<Option<VerifiedBlock>> {
+        tracing::info!("ARUN force new block");
         if self.last_proposed_round() < round {
             self.context.metrics.node_metrics.leader_timeout_total.inc();
             return self.try_propose(true);
@@ -228,6 +236,7 @@ impl Core {
         &mut self,
         ignore_leaders_check: bool,
     ) -> ConsensusResult<Option<VerifiedBlock>> {
+        tracing::info!("ARUN try propose");
         if let Some(block) = self.try_new_block(ignore_leaders_check) {
             // When there is only one authority in committee, it is unnecessary to broadcast
             // the block which will fail anyway without subscribers to the signal.
@@ -245,13 +254,20 @@ impl Core {
     /// or earlier round, then no block is created and None is returned.
     fn try_new_block(&mut self, ignore_leaders_check: bool) -> Option<VerifiedBlock> {
         let _scope = monitored_scope("Core::try_new_block");
+        tracing::info!("ARUN try new block");
         let clock_round = self.threshold_clock.get_round();
         if clock_round <= self.last_proposed_round() {
+            tracing::info!(
+                "ARUN clock_round {} <= last proposed round {}",
+                clock_round,
+                self.last_proposed_round()
+            );
             return None;
         }
         // Create a new block either because we want to "forcefully" propose a block due to a leader timeout,
         // or because we are actually ready to produce the block (leader exists)
         if !(ignore_leaders_check || self.last_quorum_leaders_exist()) {
+            tracing::info!("ARUN !(ignore_leaders_check || self.last_quorum_leaders_exist())");
             return None;
         }
 
@@ -263,6 +279,7 @@ impl Core {
 
         // 1. Consume the ancestors to be included in proposal
         let now = timestamp_utc_ms();
+        tracing::info!("{} NOW IN TRY NEW BLOCK {now:?}", self.context.own_index);
         let ancestors = self.ancestors_to_propose(clock_round, now);
 
         // 2. Consume the next transactions to be included.
@@ -334,6 +351,10 @@ impl Core {
     }
 
     pub(crate) fn get_missing_blocks(&self) -> BTreeSet<BlockRef> {
+        tracing::info!(
+            "missing blocks = {:#?}",
+            self.block_manager.missing_blocks()
+        );
         self.block_manager.missing_blocks()
     }
 
@@ -461,6 +482,7 @@ impl CoreSignals {
     /// true if block has reached even one subscriber, false otherwise.
     pub fn new_block(&self, block: VerifiedBlock) -> ConsensusResult<()> {
         if let Err(err) = self.tx_block_broadcast.send(block) {
+            tracing::info!("ARUN send new block core signal");
             warn!("Couldn't broadcast the block to any receiver: {err}");
             return Err(ConsensusError::Shutdown);
         }
@@ -470,6 +492,7 @@ impl CoreSignals {
     /// Sends a signal that threshold clock has advanced to new round. The `round_number` is the round at which the
     /// threshold clock has advanced to.
     pub fn new_round(&mut self, round_number: Round) {
+        tracing::info!("ARUN send new round core signal");
         let _ = self.new_round_sender.send_replace(round_number);
     }
 }
@@ -485,10 +508,12 @@ pub(crate) struct CoreSignalsReceivers {
 impl CoreSignalsReceivers {
     #[allow(dead_code)]
     pub(crate) fn block_broadcast_receiver(&self) -> broadcast::Receiver<VerifiedBlock> {
+        tracing::info!("ARUN rcv new block core signal");
         self.tx_block_broadcast.subscribe()
     }
 
     pub(crate) fn new_round_receiver(&self) -> watch::Receiver<Round> {
+        tracing::info!("ARUN rcv new round core signal");
         self.new_round_receiver.clone()
     }
 }
