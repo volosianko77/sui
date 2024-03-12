@@ -36,7 +36,7 @@ use super::{
     transaction_metadata::TransactionMetadata,
     type_filter::ExactTypeFilter,
 };
-use crate::zk_login_verify::{ZkLoginVerify, ZkLoginVerifyResult};
+use crate::zklogin_verify_signature::{ZkLoginVerify, ZkLoginVerifyResult};
 use crate::{
     config::ServiceConfig, context_data::db_data_provider::PgManager, data::Db, error::Error,
     mutation::Mutation,
