@@ -7,6 +7,7 @@ use crate::types::base64::Base64;
 use crate::types::chain_identifier::ChainIdentifier;
 use crate::types::dynamic_field::{DynamicField, DynamicFieldName};
 use crate::types::epoch::Epoch;
+use crate::types::object::Object;
 use crate::types::sui_address::SuiAddress;
 use crate::types::type_filter::ExactTypeFilter;
 use async_graphql::*;
@@ -17,8 +18,10 @@ use im::hashmap::HashMap as ImHashMap;
 use shared_crypto::intent::{
     AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage,
 };
+use sui_types::authenticator_state::{AuthenticatorState, AuthenticatorStateInner};
+use sui_types::object::MoveObject;
 use std::str::FromStr;
-use sui_types::dynamic_field::DynamicFieldType;
+use sui_types::dynamic_field::{get_dynamic_field_from_store, DynamicFieldType};
 use sui_types::signature::GenericSignature;
 use sui_types::signature::{AuthenticatorTrait, VerifyParams};
 use sui_types::transaction::TransactionData;
@@ -43,23 +46,82 @@ impl ZkLoginVerify {
     ) -> Result<ZkLoginVerifyResult, Error> {
         let epoch = Epoch::query(db, None, None).await?;
         let _chain_id = ChainIdentifier::query(db).await?;
+        let object = Object::query(db, SuiAddress::from_str("0x7").unwrap(), crate::types::object::ObjectLookupKey::Latest).await?.unwrap();
+        let move_object = MoveObject::try_from(&object).map_err(|_| {
+            Error::Internal(format!(
+                "Expected {} to be CoinMetadata, but it is not an object.",
+                object.address,
+            ))
+        })?;
+        let outer = bcs::from_bytes::<AuthenticatorState>(move_object.contents())
+            .map_err(|err| Error::Internal(err.to_string()))?;
+    
+        let id = outer.id.id.bytes;
+        let inner: AuthenticatorStateInner =
+            get_dynamic_field_from_store(object_store, id, &outer.version).map_err(|err| {
+                Error::Internal(format!(
+                    "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                    id, outer.version, err
+                ))
+            })?;
+        info!("tktkinner {:?}", inner);
+        // let df = DynamicField::query(
+        //     db,
+        //     SuiAddress::from_str("0x7").unwrap(),
+        //     None,
+        //     DynamicFieldName {
+        //         type_: ExactTypeFilter::from_str("u64").unwrap(),
+        //         bcs: Base64::from_str("AQAAAAAAAAA=").unwrap(),
+        //     },
+        //     DynamicFieldType::DynamicField,
+        //     None,
+        // )
+        // .await
+        // .unwrap();
 
-        let name = DynamicFieldName {
-            type_: ExactTypeFilter::from_str("u64").unwrap(),
-            bcs: Base64::from_str("AQAAAAAAAAA=").unwrap(),
-        };
-        let df = DynamicField::query(
-            db,
-            SuiAddress::from_str("0x7").unwrap(),
-            None,
-            name,
-            DynamicFieldType::DynamicField,
-            None,
-        )
-        .await
-        .unwrap();
+        // let move_object = df.unwrap().super_.super_.try_as_move().ok_or_else(|| {
+        //     Error::CursorNoFirstLast
+        // })?;
 
-        info!("ttk object {:?}", df.unwrap().super_);
+        //  match df.unwrap().super_.super_.kind {
+        //     crate::types::object::ObjectKind::Historical(x, stored) => {
+        //         info!("1tk object {:?}", x);
+        //         let move_object = x.data.try_as_move().ok_or_else(|| {
+        //                  Error::Client("not a move object".to_string())
+        //          })?;
+        //          info!("2tk move_object {:?}", move_object);
+
+        //          let outer = bcs::from_bytes::<AuthenticatorStateInner>(move_object.contents())
+        //          .map_err(|e| Error::Internal(e.to_string()))?;
+        //         info!("3tk {:?}", outer);   
+        //     }
+        //     _ => {}
+        // }
+        // let field: Field<AuthenticatorStateInner> = df.unwrap().super_
+        // .native
+        // .to_rust()
+        // .ok_or_else(|| Error::Internal("Malformed Suins NameRecord".to_string()))?;
+
+        // match df.unwrap().super_.super_.kind {
+        //     crate::types::object::ObjectKind::Historical(x, stored) => {
+        //         info!("ttk object {:?}", x);
+        //         match &x.data {
+        //            sui_types::object::Data::Move(ev) => {
+        //             ev.to_rust()
+        //                 info!("ttk kfk {:?}", ev.contents());
+        //                 let v: AuthenticatorStateInner = bcs::from_bytes(ev.contents()).unwrap();
+        //                 info!("ttk v {:?}", v);
+        //             }
+        //             _ => {}
+        //         }
+
+        //     }
+        //     _ => {}
+        // }
+        // info!("ttk object {:?}", df.unwrap().super_.super_.kind);
+        // info!("ttk type {:?}", df.unwrap().super_.native.type_());
+        // let v: AuthenticatorStateInner = bcs::from_bytes(df.unwrap().super_.native.contents()).unwrap();
+        // info!("ttk v {:?}", v);
 
         let Some(curr_epoch) = epoch else {
             return Err(Error::Internal("Cannot get current epoch".to_string()));
