@@ -28,7 +28,7 @@ use sui_json_rpc::name_service::NameServiceConfig;
 use sui_types::object::{Data, MoveObject as NativeMoveObject};
 use sui_types::TypeTag;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct MoveObject {
     /// Representation of this Move Object as a generic Object.
     pub super_: Object,
