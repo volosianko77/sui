@@ -488,7 +488,7 @@ impl CoreSignalsReceivers {
 mod test {
     use std::{collections::BTreeSet, time::Duration};
 
-    use consensus_config::{AuthorityIndex, local_committee_and_keys, Parameters, Stake};
+    use consensus_config::{local_committee_and_keys, AuthorityIndex, Parameters, Stake};
     use sui_protocol_config::ProtocolConfig;
     use tokio::{
         sync::mpsc::{unbounded_channel, UnboundedReceiver},
