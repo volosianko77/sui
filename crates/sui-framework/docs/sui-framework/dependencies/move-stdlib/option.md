@@ -429,7 +429,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_destroy_with_default">destroy_with_default</a>&lt;Element: drop&gt;(t: <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a>&lt;Element&gt;, default: Element): Element {
-    <b>let</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a> { vec } = t;
+    <b>let</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a> { <b>mut</b> vec } = t;
     <b>if</b> (<a href="../../dependencies/move-stdlib/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&vec)) default
     <b>else</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> vec)
 }
@@ -456,7 +456,7 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_destroy_some">destroy_some</a>&lt;Element&gt;(t: <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a>&lt;Element&gt;): Element {
     <b>assert</b>!(<a href="../../dependencies/move-stdlib/option.md#0x1_option_is_some">is_some</a>(&t), <a href="../../dependencies/move-stdlib/option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>);
-    <b>let</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a> { vec } = t;
+    <b>let</b> <a href="../../dependencies/move-stdlib/option.md#0x1_option_Option">Option</a> { <b>mut</b> vec } = t;
     <b>let</b> elem = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> vec);
     <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(vec);
     elem

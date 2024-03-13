@@ -235,7 +235,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_singleton">singleton</a>&lt;Element&gt;(e: Element): <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> v = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_empty">empty</a>();
+    <b>let</b> <b>mut</b> v = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_empty">empty</a>();
     <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> v, e);
     v
 }
@@ -264,8 +264,8 @@
     <b>let</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
     <b>if</b> (len == 0) <b>return</b> ();
 
-    <b>let</b> front_index = 0;
-    <b>let</b> back_index = len -1;
+    <b>let</b> <b>mut</b> front_index = 0;
+    <b>let</b> <b>mut</b> back_index = len -1;
     <b>while</b> (front_index &lt; back_index) {
         <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_swap">swap</a>(v, front_index, back_index);
         front_index = front_index + 1;
@@ -293,7 +293,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_append">append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_append">append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, <b>mut</b> other: <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
     <b>while</b> (!<a href="../../dependencies/move-stdlib/vector.md#0x1_vector_is_empty">is_empty</a>(&other)) <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
     <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_destroy_empty">destroy_empty</a>(other);
@@ -344,7 +344,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_contains">contains</a>&lt;Element&gt;(v: &<a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: &Element): bool {
-    <b>let</b> i = 0;
+    <b>let</b> <b>mut</b> i = 0;
     <b>let</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
     <b>while</b> (i &lt; len) {
         <b>if</b> (<a href="../../dependencies/move-stdlib/vector.md#0x1_vector_borrow">borrow</a>(v, i) == e) <b>return</b> <b>true</b>;
@@ -374,7 +374,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_index_of">index_of</a>&lt;Element&gt;(v: &<a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: &Element): (bool, u64) {
-    <b>let</b> i = 0;
+    <b>let</b> <b>mut</b> i = 0;
     <b>let</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
     <b>while</b> (i &lt; len) {
         <b>if</b> (<a href="../../dependencies/move-stdlib/vector.md#0x1_vector_borrow">borrow</a>(v, i) == e) <b>return</b> (<b>true</b>, i);
@@ -403,8 +403,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_remove">remove</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): Element {
-    <b>let</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
+<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_remove">remove</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, <b>mut</b> i: u64): Element {
+    <b>let</b> <b>mut</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
     // i out of bounds; <b>abort</b>
     <b>if</b> (i &gt;= len) <b>abort</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>;
 
@@ -433,7 +433,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element, i: u64) {
+<pre><code><b>public</b> <b>fun</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element, <b>mut</b> i: u64) {
     <b>let</b> len = <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_length">length</a>(v);
     // i too big <b>abort</b>
     <b>if</b> (i &gt; len) <b>abort</b> <a href="../../dependencies/move-stdlib/vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>;
