@@ -12690,6 +12690,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sui-local-fork"
+version = "1.21.0"
+dependencies = [
+ "async-trait",
+ "fastcrypto",
+ "jsonrpsee",
+ "sui-core",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-node",
+ "sui-replay",
+ "sui-types",
+ "typed-store",
+]
+
+[[package]]
 name = "sui-macros"
 version = "0.7.0"
 dependencies = [
